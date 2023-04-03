@@ -1,0 +1,75 @@
+cls
+
+function find_systemuptime
+{
+    $w32_os = Get-WmiObject Win32_OperatingSystem
+    [Management.ManagementDateTimeConverter]::ToDateTime($w32_os.LastBootUpTime)
+}
+
+Start-Transcript -Path C:\Temp\$env:COMPUTERNAME-AssetManagement-Info.txt
+
+Write-Host "-- Lese Lizenzinformationen von der Lokalen Maschine ..."
+
+$Script:_info = (Get-WmiObject -query 'SELECT * FROM SoftwareLicensingService');
+
+## Rechner Hostname
+Write-Host '
+Hostname: ' -ForegroundColor Green -NoNewline 
+$Script:_info.PSComputerName;
+
+Write-Host '
+Systeminfo: ' -ForegroundColor Green -NoNewline 
+$ENV:OSVer + " (" + $Script:_info.Version + ")";
+
+if($Script:_info.OA2xBiosMarkerStatus -eq 0)
+{
+## WL-Lizenz
+Write-Host '
+Lizenz Schlüssel: ' -ForegroundColor Green -NoNewline 
+$Script:_info.OA3xOriginalProductKey
+Write-Host 'Wenn leer, ist keine Lizenz Installiert oder es handelt sich Wahrscheinlich um eine "DAI-Lizenz".' -ForegroundColor DarkGray;
+} else {
+## BL-Lizenz
+Write-Host '
+BL-Lizenz Schlüssel: ' -ForegroundColor Green -NoNewline 
+$Script:_info.OA3xOriginalProductKey
+Write-Host 'Wenn leer, ist keine Lizenz Installiert oder es handelt sich Wahrscheinlich um eine "DAI-Lizenz".' -ForegroundColor DarkGray;
+}
+## Lizenz Beschreibung
+Write-Host '
+Lizenz Beschreibung: ' -ForegroundColor Green -NoNewline 
+$Script:_info.OA3xOriginalProductKeyDescription
+Write-Host "Wenn leer, ist keine Lizenz Beschreibung verfügbar." -ForegroundColor DarkGray;
+
+if(($Script:_info.OA3xOriginalProductKeyDescription.Length) -ge 0)
+{
+    ## DAI-Lizenz Schlüssel
+    Write-Host '
+DAI-Lizenz Schlüssel: ' -ForegroundColor Green -NoNewline 
+$Script:_info.KeyManagementServiceProductKeyID
+Write-Host "Wenn leer, wurde die DAI-Lizenz noch nicht vom KeyServer vergeben." -ForegroundColor DarkGray;
+}
+
+Write-Host '
+Bios Einstellungen:' -ForegroundColor Green -NoNewline
+Get-WmiObject -Class Win32_BIOS
+
+## Get-WmiObject -Class Win32_OperatingSystem
+Write-Host 'LastBootUpTime:
+' -ForegroundColor Green
+find_systemuptime
+
+## Network Settings
+Write-Host '
+Netzwerk Einstellungen:' -ForegroundColor Green -NoNewline
+foreach ($nic IN (Get-NetAdapter))
+{
+    if($nic.Status -eq "up")
+    {
+        Get-NetIPAddress -InterfaceIndex $nic.ifIndex | FL *
+    }
+}
+
+Stop-Transcript
+
+## EOF
